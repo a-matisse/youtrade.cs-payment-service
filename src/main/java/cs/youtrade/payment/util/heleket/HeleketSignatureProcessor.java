@@ -38,7 +38,7 @@ public class HeleketSignatureProcessor {
             String json = GSON.toJson(jsonObject);
 
             // Создаем base64 строку
-            String base64Encoded = Base64.encodeBase64String(json.getBytes(StandardCharsets.UTF_8));
+            String base64Encoded = java.util.Base64.getEncoder().encodeToString(json.getBytes(StandardCharsets.UTF_8));
 
             // Создаем хеш
             String message = base64Encoded + heleketAPI;
