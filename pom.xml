@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>cs.youtrade</groupId>
-    <artifactId>youtrade.cs-payment-service</artifactId>
+    <artifactId>youtrade-payment-service</artifactId>
     <version>1.0.0</version>
 
     <properties>
