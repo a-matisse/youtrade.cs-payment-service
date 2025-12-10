@@ -14,7 +14,9 @@ public class HeleketPaymentDto {
     @SerializedName("order_id")
     String orderId;
     BigDecimal amount;
+    @SerializedName("payment_amount")
     BigDecimal paymentAmount;
+    @SerializedName("payment_amount_usd")
     BigDecimal paymentAmountUsd;
     BigDecimal merchantAmount;
     BigDecimal commission;
