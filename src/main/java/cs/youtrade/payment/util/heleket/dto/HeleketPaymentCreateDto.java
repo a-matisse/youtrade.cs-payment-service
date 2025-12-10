@@ -9,4 +9,5 @@ public class HeleketPaymentCreateDto {
     String amount;
     String currency;
     String order_id;
+    String url_callback;
 }

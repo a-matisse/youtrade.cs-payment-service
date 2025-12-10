@@ -20,6 +20,7 @@ import static cs.youtrade.payment.util.heleket.HeleketSignatureProcessor.generat
 @Component
 public class HeleketCommunicationEndpoint {
     private static final Gson GSON = GsonConfig.createGson();
+    private static final String URL_CALLBACK = "https://youtradecs.xyz/webhook/heleket";
     private static final String HELEKET_ENDPOINT = "https://api.heleket.com/v1";
 
     @Value("${youtrade.payment.heleket.uuid}")
@@ -43,6 +44,7 @@ public class HeleketCommunicationEndpoint {
                 .amount(amount.toPlainString())
                 .order_id(id)
                 .currency("USD")
+                .url_callback(URL_CALLBACK)
                 .build();
 
         // 2. Создаем json для подписи
