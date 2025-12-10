@@ -1,8 +1,5 @@
 package cs.youtrade.payment.controller.heleket;
 
-import com.google.gson.Gson;
-import cs.youtrade.payment.controller.heleket.dto.HeleketPaymentDto;
-import cs.youtrade.payment.util.gson.GsonConfig;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,8 +18,6 @@ import static cs.youtrade.payment.util.heleket.HeleketSignatureProcessor.validat
 @Log4j2
 @RestController("/webhook/heleket")
 public class HeleketController {
-    private static final Gson gson = GsonConfig.createGson();
-
     private final String heleketAPI;
     private final RedisTemplate<String, String> redisTemplate;
     private final String redisStreamName;
