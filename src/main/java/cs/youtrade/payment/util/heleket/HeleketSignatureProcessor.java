@@ -1,10 +1,6 @@
 package cs.youtrade.payment.util.heleket;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import cs.youtrade.payment.util.gson.GsonConfig;
+import com.google.gson.*;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hc.client5.http.utils.Base64;
@@ -14,7 +10,9 @@ import java.security.MessageDigest;
 
 @Log4j2
 public class HeleketSignatureProcessor {
-    private static final Gson gson = GsonConfig.createGson();
+    private static final Gson GSON = new GsonBuilder()
+            .disableHtmlEscaping()
+            .create();
 
     public static String generateSignature(String json, String heleketAPI) {
         // Создаем base64 строку
@@ -37,7 +35,7 @@ public class HeleketSignatureProcessor {
             jsonObject.remove("sign");
 
             // Конвертируем обратно в строку JSON
-            String json = gson.toJson(jsonObject);
+            String json = GSON.toJson(jsonObject);
 
             // Создаем base64 строку
             String base64Encoded = Base64.encodeBase64String(json.getBytes(StandardCharsets.UTF_8));
