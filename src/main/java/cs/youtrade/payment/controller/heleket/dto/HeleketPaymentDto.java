@@ -1,5 +1,6 @@
 package cs.youtrade.payment.controller.heleket.dto;
 
+import com.google.gson.annotations.SerializedName;
 import lombok.Builder;
 import lombok.Value;
 
@@ -10,6 +11,7 @@ import java.math.BigDecimal;
 public class HeleketPaymentDto {
     String type;
     String uuid;
+    @SerializedName("order_id")
     String orderId;
     BigDecimal amount;
     BigDecimal paymentAmount;
