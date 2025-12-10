@@ -38,11 +38,12 @@ public class HeleketCommunicationEndpoint {
             BigDecimal amount
     ) {
         // 1. Создаем body
-        var dto = HeleketPaymentCreateDto
+        HeleketPaymentCreateDto dto = HeleketPaymentCreateDto
                 .builder()
                 .amount(amount.toPlainString())
                 .order_id(id)
-                .currency("USD");
+                .currency("USD")
+                .build();
 
         // 2. Создаем json для подписи
         String json = GSON.toJson(dto);

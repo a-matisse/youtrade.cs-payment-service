@@ -1,36 +1,39 @@
 package cs.youtrade.payment.controller.heleket.dto;
 
-import lombok.Data;
+import lombok.Builder;
+import lombok.Value;
 
 import java.math.BigDecimal;
 
-@Data
+@Value
+@Builder
 public class HeleketPaymentDto {
-    private String type;
-    private String uuid;
-    private String orderId;
-    private BigDecimal amount;
-    private BigDecimal paymentAmount;
-    private BigDecimal paymentAmountUsd;
-    private BigDecimal merchantAmount;
-    private BigDecimal commission;
-    private Boolean isFinal;
-    private String status;
-    private String from;
-    private String walletAddressUuid;
-    private String network;
-    private String currency;
-    private String payerCurrency;
-    private String additionalData;
-    private ConvertInfo convert;
-    private String txid;
-    private String sign;
+    String type;
+    String uuid;
+    String orderId;
+    BigDecimal amount;
+    BigDecimal paymentAmount;
+    BigDecimal paymentAmountUsd;
+    BigDecimal merchantAmount;
+    BigDecimal commission;
+    Boolean isFinal;
+    String status;
+    String from;
+    String walletAddressUuid;
+    String network;
+    String currency;
+    String payerCurrency;
+    String additionalData;
+    ConvertInfo convert;
+    String txid;
+    String sign;
 
-    @Data
+    @Value
+    @Builder
     public static class ConvertInfo {
-        private String toCurrency;
-        private BigDecimal commission;
-        private BigDecimal rate;
-        private BigDecimal amount;
+        String toCurrency;
+        BigDecimal commission;
+        BigDecimal rate;
+        BigDecimal amount;
     }
 }

@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+
+  youtrade-payment-service:
+    image: youtrade-payment-service
+    restart: on-failure
+    network_mode: "host"
+    env_file:
+      - ./default.env
+      - ${HOME}/lis-secret/secret.env
+
+    command: java --enable-preview -jar -XX:ParallelGCThreads=4 -XX:+UseZGC -Xms16m -Xmx64m target/youtrade-payment-service-1.0.0.jar
+    volumes:
+      - ${HOME}/lis-csv-data:/app/lis-items-csv
+
+volumes:
+  postgres_data:
+    external: true
