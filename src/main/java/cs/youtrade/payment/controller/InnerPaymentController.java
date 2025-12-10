@@ -1,6 +1,6 @@
 package cs.youtrade.payment.controller;
 
-import cs.youtrade.payment.controller.heleket.dto.HeleketPaymentCreateAnsDto;
+import cs.youtrade.payment.controller.dto.UserPaymentCreateDto;
 import cs.youtrade.payment.util.heleket.HeleketCommunicationEndpoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +28,14 @@ public class InnerPaymentController {
                     .badRequest()
                     .body("Error occured on payment creation");
 
-        return ResponseEntity.ok(ans);
+        var result = ans.getResponse().getResult();
+        UserPaymentCreateDto dto = UserPaymentCreateDto
+                .builder()
+                .id(result.getOrderId())
+                .amount(result.getAmount())
+                .type(TopUpType.HELEKET)
+                .url(result.getUrl())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 }
