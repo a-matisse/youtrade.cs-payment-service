@@ -7,6 +7,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
@@ -17,7 +18,8 @@ import static cs.youtrade.payment.util.heleket.HeleketSignatureProcessor.validat
 
 @Log4j2
 @RequiredArgsConstructor
-@RestController("/webhook/heleket")
+@RestController
+@RequestMapping("/webhook/heleket")
 public class HeleketController {
     private final HeleketPaymentService heleketPaymentService;
 
