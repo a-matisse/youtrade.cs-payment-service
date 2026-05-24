@@ -13,9 +13,7 @@ services:
       -Xms64m -Xmx64m
       -XX:+UseZGC
       -XX:+AlwaysPreTouch
-      -jar target/youtrade-webhook-service-1.0.0.jar
-    volumes:
-      - ${HOME}/lis-csv-data:/app/lis-items-csv
+      -jar target/youtrade-payment-service-1.0.0.jar
 
 volumes:
   postgres_data:

@@ -7,8 +7,6 @@ WORKDIR /app
 # Копируем файлы проекта
 COPY pom.xml .
 COPY src ./src
-COPY default.env /app/default.env
-
 # Копируем default.env (убедись, что файл рядом с Dockerfile)
 COPY default.env /app/default.env
 
