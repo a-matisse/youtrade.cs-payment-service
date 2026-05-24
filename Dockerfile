@@ -1,8 +1,13 @@
-FROM maven:3.9.9-amazoncorretto-17
-RUN yum update -y && yum install -y git
+FROM maven:3.9.16-eclipse-temurin-25-alpine
+# Alpine использует apk, а не yum
+RUN apk update && apk add --no-cache git
 
-COPY . /app
 WORKDIR /app
+
+# Копируем файлы проекта
+COPY pom.xml .
+COPY src ./src
+COPY default.env /app/default.env
 
 # Копируем default.env (убедись, что файл рядом с Dockerfile)
 COPY default.env /app/default.env
