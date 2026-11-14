@@ -18,15 +18,18 @@ public class TrybitController {
     private final TrybitPaymentService paymentService;
 
     @PostMapping(value = {"/notification", "/notification/"}, consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Boolean> notification(@RequestBody TrybitNotificationDto notification) {
-        return ResponseEntity.ok(paymentService.proceed(notification));
+    public ResponseEntity<?> notification(@RequestBody TrybitNotificationDto notification) {
+        return switch (paymentService.proceed(notification)) {
+            case PROCESSED -> ResponseEntity.ok(true);
+            case EMPTY_ORDER_ID -> ResponseEntity.ok().build();
+        };
     }
 
     @PostMapping(value = {"/notification", "/notification/"}, consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<Boolean> formNotification(
+    public ResponseEntity<?> formNotification(
             @RequestParam String status,
             @RequestParam("invoice_id") String invoiceId,
-            @RequestParam("order_id") String orderId,
+            @RequestParam(value = "order_id", required = false) String orderId,
             @RequestParam String token
     ) {
         return notification(new TrybitNotificationDto(status, invoiceId, orderId, token));

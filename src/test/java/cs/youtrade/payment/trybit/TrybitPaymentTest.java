@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -95,6 +97,52 @@ class TrybitPaymentTest {
                         .param("order_id", "order-1").param("token", TrybitTestToken.valid()))
                 .andExpect(status().isOk());
         verify(stream).add(any(MapRecord.class));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "None", "null", " None "})
+    void acknowledgesJsonWithoutOrderIdWithEmptyBodyAndNoApiOrRedisAccess(String orderId) throws Exception {
+        var body = new java.util.LinkedHashMap<String, Object>();
+        body.put("status", "success");
+        body.put("invoice_id", "QPTSMP7H");
+        body.put("order_id", orderId);
+        body.put("token", TrybitTestToken.valid());
+        // The actual provider delivery contains "None" in invoice_info.order_id.
+        body.put("invoice_info", Map.of("uuid", "INV-QPTSMP7H", "order_id", "None", "test_mode", true));
+        mvc.perform(post(CALLBACK).contentType(MediaType.APPLICATION_JSON).content(MAPPER.writeValueAsString(body)))
+                .andExpect(status().isOk()).andExpect(content().string(""));
+        verifyNoInteractions(endpoint, redis);
+    }
+
+    @Test
+    void acknowledgesOmittedJsonOrderIdWithEmptyBody() throws Exception {
+        String body = MAPPER.writeValueAsString(Map.of("status", "success", "invoice_id", "QPTSMP7H",
+                "token", TrybitTestToken.valid()));
+        mvc.perform(post(CALLBACK).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(content().string(""));
+        verifyNoInteractions(endpoint, redis);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"None", "null", " "})
+    void acknowledgesFormWithoutOrderIdWithEmptyBodyAndNoApiOrRedisAccess(String orderId) throws Exception {
+        var request = post(CALLBACK).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("status", "success").param("invoice_id", "QPTSMP7H").param("token", TrybitTestToken.valid());
+        if (orderId != null) {
+            request.param("order_id", orderId);
+        }
+        mvc.perform(request).andExpect(status().isOk()).andExpect(content().string(""));
+        verifyNoInteractions(endpoint, redis);
+    }
+
+    @Test
+    void stillRejectsUnsignedNotificationWithoutOrderId() throws Exception {
+        mvc.perform(post(CALLBACK).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"success\",\"invoice_id\":\"QPTSMP7H\",\"order_id\":null}"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(endpoint, redis);
     }
 
     @Test

@@ -13,6 +13,7 @@ assumptions:
   - The fixture's control route represents invoice confirmation; it is not a TryBit API endpoint.
   - Owner mock lookup was skipped because the installed CLI does not support postman status.
 observed:
+  - Authenticated JSON and form callbacks without order_id return 200 with an empty body and log the skip without API or Redis access.
   - The real HTTP client called the fixture's create and merchant info endpoints successfully.
   - A verified paid callback published the asserted USD amount and COMPLETED status.
   - Upstream 503, malformed JSON and API error responses returned 502 without Redis writes.

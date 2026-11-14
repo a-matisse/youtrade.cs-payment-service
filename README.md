@@ -59,7 +59,12 @@ imply that it sends a webhook for every intermediate or canceled state. There is
 no scheduled status polling. Repeated valid notifications may repeat Redis events.
 The consumer must recognize the new `TRYBIT` top-up type before deployment.
 
-The callback returns HTTP 200 with `true` after Redis accepts the event. Invalid
+Authenticated notifications with a missing, blank, null or `None` order ID are
+logged and acknowledged with HTTP 200 and an empty body. They do not trigger an
+API lookup or a Redis event (and therefore do not trigger downstream WebSocket
+notifications). Signature verification still applies to these notifications.
+
+The callback returns HTTP 200 with `true` after Redis accepts a regular order event. Invalid
 signatures return 401, malformed or mismatched orders 400, upstream failures or
 unknown statuses 502. Missing TryBit configuration returns 503, while Heleket
 remains available. API/Redis failures are not acknowledged as successful payments.
@@ -92,6 +97,6 @@ credentials from `.env` and creates **one new unpaid USD 1.00 invoice per run** 
 the real provider, then reads it back. It never pays an invoice or writes to Redis.
 It is disabled by default.
 
-Verified locally: 15 automated tests passed against local mocks/fixtures; the
+Verified locally: 28 automated tests passed against local mocks/fixtures; the
 separate live check created and retrieved invoice `INV-SRDS4ITE`. Actual provider
 POSTBACK delivery and the external Redis consumer were not exercised.

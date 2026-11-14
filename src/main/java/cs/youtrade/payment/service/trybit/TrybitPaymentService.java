@@ -8,6 +8,7 @@ import cs.youtrade.payment.controller.dto.UserPaymentProcedureDto;
 import cs.youtrade.payment.controller.trybit.dto.TrybitNotificationDto;
 import cs.youtrade.payment.util.gson.GsonConfig;
 import cs.youtrade.payment.util.trybit.TrybitCommunicationEndpoint;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -20,8 +21,14 @@ import java.util.Map;
 
 import static cs.youtrade.payment.util.trybit.TrybitSignatureProcessor.validateSignature;
 
+@Log4j2
 @Service
 public class TrybitPaymentService {
+    public enum NotificationResult {
+        PROCESSED,
+        EMPTY_ORDER_ID
+    }
+
     private static final Gson GSON = GsonConfig.createGson();
     private final TrybitCommunicationEndpoint endpoint;
     private final RedisTemplate<String, String> redisTemplate;
@@ -53,15 +60,20 @@ public class TrybitPaymentService {
                 .id(id).amount(amount).type(TopUpType.TRYBIT).url(invoice.link()).build();
     }
 
-    public boolean proceed(TrybitNotificationDto notification) {
+    public NotificationResult proceed(TrybitNotificationDto notification) {
         requireSecret();
         if (!validateSignature(notification.token(), secret)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid TryBit signature");
         }
         if (!"success".equals(notification.status()) || notification.invoiceId() == null
-                || notification.invoiceId().isBlank() || notification.orderId() == null
-                || notification.orderId().isBlank()) {
+                || notification.invoiceId().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid TryBit notification");
+        }
+        String orderId = notification.orderId();
+        if (orderId == null || orderId.isBlank() || "None".equalsIgnoreCase(orderId.strip())
+                || "null".equalsIgnoreCase(orderId.strip())) {
+            log.info("Ignoring TryBit notification: order_id is empty");
+            return NotificationResult.EMPTY_ORDER_ID;
         }
 
         // The JWT does not guarantee that the remaining POSTBACK fields are signed.
@@ -88,7 +100,7 @@ public class TrybitPaymentService {
         if (redisTemplate.opsForStream().add(record) == null) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Payment event was not published");
         }
-        return true;
+        return NotificationResult.PROCESSED;
     }
 
     private void requireSecret() {
