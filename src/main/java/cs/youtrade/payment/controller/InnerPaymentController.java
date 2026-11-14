@@ -2,6 +2,7 @@ package cs.youtrade.payment.controller;
 
 import cs.youtrade.payment.controller.dto.UserPaymentCreateDto;
 import cs.youtrade.payment.util.heleket.HeleketCommunicationEndpoint;
+import cs.youtrade.payment.service.trybit.TrybitPaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +17,15 @@ import java.math.BigDecimal;
 @RequestMapping("/payment/create")
 public class InnerPaymentController {
     private final HeleketCommunicationEndpoint endpoint;
+    private final TrybitPaymentService trybitPaymentService;
+
+    @PostMapping("/trybit")
+    public ResponseEntity<UserPaymentCreateDto> createTrybitPayment(
+            @RequestParam String id,
+            @RequestParam BigDecimal amount
+    ) {
+        return ResponseEntity.ok(trybitPaymentService.createPayment(id, amount));
+    }
 
     @PostMapping("/heleket")
     public ResponseEntity<?> createHeleketPayment(

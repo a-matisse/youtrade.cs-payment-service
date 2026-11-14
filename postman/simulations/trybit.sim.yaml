@@ -1,0 +1,8 @@
+simulation: trybit-payment
+routing: path
+mocks:
+  - name: trybit
+    routeKey: trybit
+    origin:
+      - api.trybit.com
+    path: postman/mocks/trybit/config.yaml

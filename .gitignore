@@ -39,3 +39,6 @@ build/
 
 ### Custom ###
 /default.env
+/.env
+/.env.*
+!/.env.example

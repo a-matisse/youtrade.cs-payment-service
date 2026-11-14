@@ -1,0 +1,11 @@
+version: 1
+name: Trybit API V2 contract fixture
+slug: trybit
+protocol: http
+port: 4500
+origin: api.trybit.com
+interceptRequests: true
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

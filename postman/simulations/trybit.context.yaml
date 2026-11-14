@@ -1,0 +1,22 @@
+name: TryBit payment integration
+sources:
+  - https://docs.trybit.com/api-reference-v2/authorization
+  - https://docs.trybit.com/api-reference-v2/create-invoice
+  - https://docs.trybit.com/api-reference-v2/invoice-information
+  - https://docs.trybit.com/api-reference-v2/postback
+scope:
+  - Creation and invoice lookup exercise the real Apache HTTP client and Gson serialization.
+  - Synthetic HS256 POSTBACKs exercise the MVC handler and real TrybitPaymentService.
+  - Redis is mocked in these tests; stream payloads and lack of writes on rejection are asserted.
+  - The fixture validates auth headers, shop_id, numeric USD amount, order_id and UUID lookup.
+assumptions:
+  - The fixture's control route represents invoice confirmation; it is not a TryBit API endpoint.
+  - Owner mock lookup was skipped because the installed CLI does not support postman status.
+observed:
+  - The real HTTP client called the fixture's create and merchant info endpoints successfully.
+  - A verified paid callback published the asserted USD amount and COMPLETED status.
+  - Upstream 503, malformed JSON and API error responses returned 502 without Redis writes.
+  - A separate opt-in live check created and read unpaid USD 1.00 invoice INV-SRDS4ITE.
+unverified:
+  - Actual provider webhook delivery, retry behavior and real blockchain payments.
+  - New TRYBIT enum support and idempotency in the external Redis consumer.
