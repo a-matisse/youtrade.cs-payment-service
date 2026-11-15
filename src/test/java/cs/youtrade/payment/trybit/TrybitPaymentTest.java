@@ -73,7 +73,7 @@ class TrybitPaymentTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"paid,COMPLETED", "overpaid,COMPLETED", "partial,PENDING", "created,PENDING", "canceled,CANCELLED"})
+    @CsvSource({"paid,COMPLETED", "overpaid,COMPLETED", "partial,PENDING", "created,PENDING", "canceled,CANCELLED", "failed,CANCELLED"})
     void verifiesInvoiceAndPublishesAuthoritativeUsdAmount(String providerStatus, String expectedStatus) throws Exception {
         when(endpoint.getInvoice("INV-89UX09KA")).thenReturn(invoice(providerStatus, "order-1"));
         mvc.perform(post(CALLBACK).contentType(MediaType.APPLICATION_JSON).content(notification()))

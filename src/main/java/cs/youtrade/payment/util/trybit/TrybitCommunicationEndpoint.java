@@ -19,6 +19,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -48,7 +50,8 @@ public class TrybitCommunicationEndpoint {
 
     public TrybitInvoice createPayment(String id, BigDecimal amount) {
         return request("/invoice/create", Map.of(
-                "shop_id", shopId, "amount", amount, "currency", "USD", "order_id", id
+                "shop_id", shopId, "amount", amount, "currency", "USD", "order_id", id,
+                "add_fields", Map.of("time_to_pay", Map.of("hours", 1, "minutes", 0))
         ), new TypeToken<TrybitApiResponse<TrybitInvoice>>() {});
     }
 
@@ -59,6 +62,18 @@ public class TrybitCommunicationEndpoint {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "TryBit invoice not found");
         }
         return invoices.getFirst();
+    }
+
+    public boolean isConfigured() {
+        return !apiKey.isBlank() && !shopId.isBlank();
+    }
+
+    public List<TrybitInvoice> listInvoices(LocalDate start, LocalDate end, int offset, int limit) {
+        var format = DateTimeFormatter.ofPattern("dd.MM.uuuu");
+        return request("/invoice/merchant/list", Map.of(
+                "start", start.format(format), "end", end.format(format),
+                "offset", offset, "limit", limit
+        ), new TypeToken<TrybitApiResponse<List<TrybitInvoice>>>() {});
     }
 
     private <T> T request(String path, Object body, TypeToken<TrybitApiResponse<T>> type) {

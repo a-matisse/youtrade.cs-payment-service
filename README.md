@@ -35,7 +35,9 @@ Response (same shape as Heleket):
 {"id":"YOUR_ORDER_ID","amount":100.25,"type":"TRYBIT","url":"https://pay.trybit.com/INVOICE_ID"}
 ```
 
-Invoices are created in USD. The callback requires an unexpired HS256 JWT signed
+Invoices are created in USD with a one-hour payment lifetime, explicitly sent as
+`add_fields.time_to_pay: {"hours": 1, "minutes": 0}`.
+The callback requires an unexpired HS256 JWT signed
 with `TRYBIT_SECRET_KEY`, then retrieves the invoice through the authenticated
 TryBit API. The event's order, status and `amount_usd` come from that API response,
 not from the untrusted notification. Cryptocurrency amounts are never used as USD.
@@ -44,7 +46,7 @@ not from the untrusted notification. Cryptocurrency amounts are never used as US
 | --- | --- |
 | `paid`, `overpaid` | `COMPLETED` |
 | `created`, `partial` | `PENDING` |
-| `canceled` | `CANCELLED` |
+| `canceled`, `failed` | `CANCELLED` |
 
 Event example:
 
@@ -55,8 +57,28 @@ Event example:
 As with Heleket, the event amount is the original invoice amount (USD), including
 for partial or excess payments. `partial` does not complete the payment. TryBit
 documents POSTBACK delivery after invoice confirmation; these mappings do not
-imply that it sends a webhook for every intermediate or canceled state. There is
-no scheduled status polling. Repeated valid notifications may repeat Redis events.
+imply that it sends a webhook for every intermediate or canceled state.
+
+A fallback poll checks the provider's invoice list every 60 seconds (fixed delay,
+first run after 10 seconds). It scans invoices created today and yesterday in UTC,
+including invoices created before this service restart, and publishes `CANCELLED`
+for `canceled` or `failed` invoices with a real order ID. It does not replay paid
+or pending invoices from the history. Pagination uses batches of 100, with a safety
+limit of 100 pages per pass; reaching that limit produces a warning.
+
+Cancellation events from polling and webhooks share a concurrent in-memory cache
+through the common `TrybitPaymentService.processInvoice(...)` entry point. Invoice
+validation, status mapping, cancellation deduplication and event publication are
+separate steps; polling selects the `CANCELLATIONS_ONLY` processing mode.
+The cache retains entries for three days. Redis failures do not populate it, so the next
+poll retries publication. There is no new database. After a restart or across
+multiple instances, a cancellation can be delivered again; the consumer must
+deduplicate by order ID. Other repeated valid webhooks may also repeat events.
+
+Set `TRYBIT_POLL_ENABLED=false` to disable the fallback, or adjust
+`TRYBIT_POLL_INTERVAL_MS` (default `60000`). `TRYBIT_POLL_LOOKBACK_DAYS` accepts 1
+or 2 (default 2). A polling failure is logged and retried on the next pass. Old
+invoices outside this creation-date window are not checked by the fallback.
 The consumer must recognize the new `TRYBIT` top-up type before deployment.
 
 Authenticated notifications with a missing, blank, null or `None` order ID are
@@ -97,6 +119,6 @@ credentials from `.env` and creates **one new unpaid USD 1.00 invoice per run** 
 the real provider, then reads it back. It never pays an invoice or writes to Redis.
 It is disabled by default.
 
-Verified locally: 28 automated tests passed against local mocks/fixtures; the
+Verified locally: 39 automated tests passed against local mocks/fixtures; the
 separate live check created and retrieved invoice `INV-SRDS4ITE`. Actual provider
 POSTBACK delivery and the external Redis consumer were not exercised.

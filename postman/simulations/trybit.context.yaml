@@ -3,6 +3,7 @@ sources:
   - https://docs.trybit.com/api-reference-v2/authorization
   - https://docs.trybit.com/api-reference-v2/create-invoice
   - https://docs.trybit.com/api-reference-v2/invoice-information
+  - https://docs.trybit.com/api-reference-v2/invoice-list
   - https://docs.trybit.com/api-reference-v2/postback
 scope:
   - Creation and invoice lookup exercise the real Apache HTTP client and Gson serialization.
@@ -13,6 +14,11 @@ assumptions:
   - The fixture's control route represents invoice confirmation; it is not a TryBit API endpoint.
   - Owner mock lookup was skipped because the installed CLI does not support postman status.
 observed:
+  - The real API reported INV-UZRHPWD9 as canceled with a real order_id and amount_usd 100.
+  - The real merchant list API returned 8 invoices for the poll window, including INV-UZRHPWD9.
+  - Cancellation polling scans today and yesterday in UTC without publishing historical paid invoices.
+  - Cancellation deduplication is shared with webhooks in memory only; restarts and multiple instances still require an idempotent consumer.
+  - The creation fixture requires add_fields.time_to_pay with hours 1 and minutes 0.
   - Authenticated JSON and form callbacks without order_id return 200 with an empty body and log the skip without API or Redis access.
   - The real HTTP client called the fixture's create and merchant info endpoints successfully.
   - A verified paid callback published the asserted USD amount and COMPLETED status.

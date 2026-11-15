@@ -8,6 +8,7 @@ import cs.youtrade.payment.controller.dto.UserPaymentProcedureDto;
 import cs.youtrade.payment.controller.trybit.dto.TrybitNotificationDto;
 import cs.youtrade.payment.util.gson.GsonConfig;
 import cs.youtrade.payment.util.trybit.TrybitCommunicationEndpoint;
+import cs.youtrade.payment.util.trybit.dto.TrybitInvoice;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -17,7 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static cs.youtrade.payment.util.trybit.TrybitSignatureProcessor.validateSignature;
 
@@ -29,11 +34,25 @@ public class TrybitPaymentService {
         EMPTY_ORDER_ID
     }
 
+    public enum InvoiceProcessingMode {
+        ALL_STATUSES,
+        CANCELLATIONS_ONLY
+    }
+
     private static final Gson GSON = GsonConfig.createGson();
+    private static final Map<String, PaymentStatus> INVOICE_STATUSES = Map.of(
+            "paid", PaymentStatus.COMPLETED,
+            "overpaid", PaymentStatus.COMPLETED,
+            "created", PaymentStatus.PENDING,
+            "partial", PaymentStatus.PENDING,
+            "canceled", PaymentStatus.CANCELLED,
+            "failed", PaymentStatus.CANCELLED
+    );
     private final TrybitCommunicationEndpoint endpoint;
     private final RedisTemplate<String, String> redisTemplate;
     private final String redisStreamName;
     private final String secret;
+    private final ConcurrentMap<String, Instant> publishedCancellations = new ConcurrentHashMap<>();
 
     public TrybitPaymentService(
             TrybitCommunicationEndpoint endpoint,
@@ -61,6 +80,27 @@ public class TrybitPaymentService {
     }
 
     public NotificationResult proceed(TrybitNotificationDto notification) {
+        validateNotification(notification);
+        if (isEmptyOrderId(notification.orderId())) {
+            log.info("Ignoring TryBit notification: order_id is empty");
+            return NotificationResult.EMPTY_ORDER_ID;
+        }
+        var invoice = loadVerifiedInvoice(notification);
+        processInvoice(invoice, InvoiceProcessingMode.ALL_STATUSES);
+        return NotificationResult.PROCESSED;
+    }
+
+    /** Shared processing path for invoices returned by authenticated TryBit API calls. */
+    public void processInvoice(TrybitInvoice invoice, InvoiceProcessingMode mode) {
+        if (!shouldProcessInvoice(invoice, mode)) {
+            return;
+        }
+        validateInvoice(invoice);
+        PaymentStatus status = decidePaymentStatus(invoice.status());
+        publishInvoice(invoice, status);
+    }
+
+    private void validateNotification(TrybitNotificationDto notification) {
         requireSecret();
         if (!validateSignature(notification.token(), secret)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid TryBit signature");
@@ -69,13 +109,9 @@ public class TrybitPaymentService {
                 || notification.invoiceId().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid TryBit notification");
         }
-        String orderId = notification.orderId();
-        if (orderId == null || orderId.isBlank() || "None".equalsIgnoreCase(orderId.strip())
-                || "null".equalsIgnoreCase(orderId.strip())) {
-            log.info("Ignoring TryBit notification: order_id is empty");
-            return NotificationResult.EMPTY_ORDER_ID;
-        }
+    }
 
+    private TrybitInvoice loadVerifiedInvoice(TrybitNotificationDto notification) {
         // The JWT does not guarantee that the remaining POSTBACK fields are signed.
         // Retrieve authoritative order, amount and status with our own API credentials.
         String uuid = notification.invoiceId().startsWith("INV-")
@@ -84,15 +120,56 @@ public class TrybitPaymentService {
         if (!uuid.equals(invoice.uuid()) || !notification.orderId().equals(invoice.orderId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "TryBit invoice does not match the order");
         }
+        return invoice;
+    }
+
+    private boolean shouldProcessInvoice(TrybitInvoice invoice, InvoiceProcessingMode mode) {
+        if (invoice == null || isEmptyOrderId(invoice.orderId())) {
+            return false;
+        }
+        return mode == InvoiceProcessingMode.ALL_STATUSES || (invoice.status() != null
+                && INVOICE_STATUSES.get(invoice.status()) == PaymentStatus.CANCELLED);
+    }
+
+    private void validateInvoice(TrybitInvoice invoice) {
+        if (invoice.uuid() == null || invoice.uuid().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "TryBit invoice has no valid UUID");
+        }
         if (invoice.amountUsd() == null || invoice.amountUsd().signum() <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "TryBit invoice has no valid USD amount");
         }
-        PaymentStatus status = switch (invoice.status() == null ? "" : invoice.status()) {
-            case "paid", "overpaid" -> PaymentStatus.COMPLETED;
-            case "created", "partial" -> PaymentStatus.PENDING;
-            case "canceled" -> PaymentStatus.CANCELLED;
-            default -> throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unknown TryBit invoice status");
-        };
+    }
+
+    private PaymentStatus decidePaymentStatus(String providerStatus) {
+        PaymentStatus status = providerStatus == null ? null : INVOICE_STATUSES.get(providerStatus);
+        if (status == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unknown TryBit invoice status");
+        }
+        return status;
+    }
+
+    private void publishInvoice(TrybitInvoice invoice, PaymentStatus status) {
+        if (status == PaymentStatus.CANCELLED) {
+            publishCancellation(invoice);
+        } else {
+            publishEvent(invoice, status);
+        }
+    }
+
+    private void publishCancellation(TrybitInvoice invoice) {
+        // The cache only deduplicates cancellation events in this process. The Redis
+        // consumer must remain idempotent across restarts and service instances.
+        Instant now = Instant.now();
+        Instant cutoff = now.minus(Duration.ofDays(3));
+        publishedCancellations.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
+        publishedCancellations.computeIfAbsent(invoice.uuid(), uuid -> {
+            publishEvent(invoice, PaymentStatus.CANCELLED);
+            log.info("Published TryBit cancellation for invoice {}", uuid);
+            return now;
+        });
+    }
+
+    private void publishEvent(TrybitInvoice invoice, PaymentStatus status) {
         var event = UserPaymentProcedureDto.builder()
                 .id(invoice.orderId()).amount(invoice.amountUsd()).type(TopUpType.TRYBIT).status(status).build();
         MapRecord<String, String, String> record = MapRecord.create(redisStreamName,
@@ -100,7 +177,11 @@ public class TrybitPaymentService {
         if (redisTemplate.opsForStream().add(record) == null) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Payment event was not published");
         }
-        return NotificationResult.PROCESSED;
+    }
+
+    private static boolean isEmptyOrderId(String orderId) {
+        return orderId == null || orderId.isBlank() || "None".equalsIgnoreCase(orderId.strip())
+                || "null".equalsIgnoreCase(orderId.strip());
     }
 
     private void requireSecret() {

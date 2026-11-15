@@ -44,6 +44,12 @@ class TrybitApiContractTest {
             mvc.perform(post("/payment/create/trybit").param("id", "contract-order").param("amount", "100.25"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.amount").value(100.25))
                     .andExpect(jsonPath("$.url").value("https://pay.trybit.com/89UX09KA"));
+            var today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+            var listed = endpoint.client.listInvoices(today.minusDays(1), today, 0, 100);
+            org.junit.jupiter.api.Assertions.assertEquals(1, listed.size());
+            org.junit.jupiter.api.Assertions.assertEquals("contract-order", listed.getFirst().orderId());
+            org.junit.jupiter.api.Assertions.assertEquals("created", listed.getFirst().status());
+            org.junit.jupiter.api.Assertions.assertTrue(endpoint.client.listInvoices(today.minusDays(1), today, 100, 100).isEmpty());
             control(baseUrl, "{\"status\":\"paid\"}");
             String notification = new ObjectMapper().writeValueAsString(Map.of("status", "success",
                     "invoice_id", "89UX09KA", "order_id", "contract-order", "token", TrybitTestToken.valid()));
